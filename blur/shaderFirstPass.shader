@@ -32,7 +32,6 @@ Shader "Unlit/shaderFirstPass"
 
             uniform sampler2D _MainTex;
             uniform int pixelRadius;
-            float4 _MainTex_ST;
 
             v2f vert (appdata v)
             {
@@ -64,9 +63,8 @@ Shader "Unlit/shaderFirstPass"
                         x = (screen - pixelRadius + j) / _ScreenParams.x * 2 - 1;
                     }
 
-                    // float2 tmp = TRANSFORM_TEX(float2(x, screenCoord.y), _MainTex);
                     float2 tmp = float2(x, tex.y);
-                    col += tex2D(_MainTex, tmp); // UnityStereoScreenSpaceUVAdjust(i.uv[0], _MainTex_ST)).xyz
+                    col += tex2D(_MainTex, tmp);
                 }
 
                 col /= d;

@@ -33,7 +33,6 @@ Shader "Unlit/shaderSecondPass"
 
             uniform sampler2D _MainTex;
             uniform int pixelRadius;
-            float4 _MainTex_ST;
 
             v2f vert (appdata v)
             {
