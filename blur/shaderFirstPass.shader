@@ -16,7 +16,7 @@ Shader "Unlit/shaderFirstPass"
             #pragma fragment frag
 
             #include "UnityCG.cginc"
-
+            
             struct appdata
             {
                 float4 vertex : POSITION;
@@ -48,7 +48,7 @@ Shader "Unlit/shaderFirstPass"
                 float2 tex = i.uv;
                 float4 screenCoord = i.screenPos;
 
-                int d = pixelRadius * 2;
+                int d = pixelRadius * 2 + 1;
                 for (int j = 0; j < d; ++j) {
 
                     if (j == pixelRadius) {

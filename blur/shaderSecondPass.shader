@@ -49,7 +49,8 @@ Shader "Unlit/shaderSecondPass"
                 float2 tex = i.uv;
                 float4 screenCoord = i.screenPos;
 
-                for (int j = 0; j < pixelRadius * 2; ++j) {
+                int d = pixelRadius * 2 + 1;
+                for (int j = 0; j < d; ++j) {
 
                     if (j == pixelRadius) {
                         continue;
@@ -67,7 +68,7 @@ Shader "Unlit/shaderSecondPass"
                     col += tex2D(_MainTex, tmp);
                 }
 
-                col /= pixelRadius * 2;
+                col /= d;
                 return col;
             }
 
