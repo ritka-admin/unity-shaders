@@ -3,7 +3,7 @@ Shader "Hidden/ao_factor_pass"
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}   // VS position
-        n_samples ("n_samples", Range(8, 128)) = 8
+        n_samples ("n_samples", Range(1, 40)) = 1
     }
     SubShader
     {
@@ -41,26 +41,38 @@ Shader "Hidden/ao_factor_pass"
             }
 
             int n_samples;
-            sampler2D _MainTex;
-            sampler2D _CameraDepthNormalsTexture;
+            sampler2D_float _MainTex;
+            sampler2D_float _CameraDepthNormalsTexture;
+            sampler2D_float _CameraDepthTexture;
+            uniform float4 _MainTex_TexelSize;
 
-            // float gen_random(float2 uv) {
-            //     return frac(sin(dot(uv,float2(12.9898,78.233)))*43758.5453123)
-            // }
+            float gen_random(float2 uv) {
+                return frac(sin(dot(uv,float2(12.9898,78.233)))*43758.5453123);
+            }
 
-            fixed4 frag (v2f i) : SV_Target
+            float4 get_camera_position(float2 uv) {
+                float depth = tex2D(_CameraDepthTexture, uv).r;
+                float4 prev_coord = float4(uv * 2.0 - 1.0, depth, 1.0);
+                float4 camera_position = mul(unity_CameraInvProjection, prev_coord);
+                float4 position = float4(camera_position.xyz / camera_position.w, 1.0);
+                return position;
+            }
+
+            float4 frag (v2f i) : SV_Target
             {
                 float ao_factor = 0.0f;
-
                 float _depth;
                 float3 normal;
-                float4 position = tex2D(_MainTex, i.uv);
-                float4 depth_normal = tex2D(_CameraDepthNormalsTexture, i.uv);
 
+                float4 depth_normal = tex2D(_CameraDepthNormalsTexture, i.uv);
                 DecodeDepthNormal(depth_normal, _depth, normal);
-                
+
+                float4 position = get_camera_position(i.uv);
+                // return position;
+
                 // traverse by x
-                for (int j = 0; j < n_samples * 2 + 1; ++j) {
+                int diametr = n_samples * 2 + 1;
+                for (int j = 0; j < diametr; ++j) {
                     float x;
                     float screen_x = i.screenPos.x * _ScreenParams.x;
                     if (screen_x - n_samples + j < 0 || screen_x - n_samples + j > _ScreenParams.x) {
@@ -70,7 +82,7 @@ Shader "Hidden/ao_factor_pass"
                     }
 
                     // traverse by y
-                    for (int k = 0; k < n_samples * 2 + 1; ++k) {
+                    for (int k = 0; k < diametr; ++k) {
 
                         if (j == n_samples && k == n_samples) {
                             continue;
@@ -80,24 +92,25 @@ Shader "Hidden/ao_factor_pass"
                         float screen_y = i.screenPos.y * _ScreenParams.y;
                         if (screen_y - n_samples + k < 0 || screen_y - n_samples + k > _ScreenParams.y) {
                             y = (screen_y + n_samples - k) / _ScreenParams.y * 2 - 1;
-                        } else { 
+                        } else {
                             y = (screen_y - n_samples + k) / _ScreenParams.y * 2 - 1;
                         }
-
-                        float2 neigh = float2(x, y);
-                        float4 occluder = tex2D(_MainTex, neigh);
+                        
+                        float2 neigh = float2(x, y); 
+                        float4 occluder = get_camera_position(neigh);
                         float3 diff = occluder - position;
                         float d = length(diff);
-                        ao_factor += max(dot(normal, normalize(diff)), 0.0) * (1.0 / (1.0 + d));
-                        // return fixed4(occluder.xyz, 1.0);
+                        ao_factor += max(dot(normal, normalize(diff)) + 0.25f, 0.0f) / (0.5f + d);
+                        // return occluder;
+                        // return fixed4(diff.xyz, 1.0);
+
+                        // ao_factor += occluder.z > position.z ? 1.0 : 0.0;
                     }
                 }
                 
-                ao_factor /= pow(n_samples * 2 + 1, 2);
-                ao_factor = 1 - ao_factor;
-                return fixed4(ao_factor, ao_factor, ao_factor, 1.0);
-                // return fixed4(normal.x, normal.y, normal.z, 1.0);
-                // return fixed4(depth, depth, depth, 1.0);
+                ao_factor /= (pow(diametr, 2) - 1) * 0.8;
+                // ao_factor = 1 - ao_factor;
+                return float4(ao_factor, ao_factor, ao_factor, 1.0);
             }
             ENDCG
         }

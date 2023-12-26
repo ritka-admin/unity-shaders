@@ -2,8 +2,7 @@ Shader "Hidden/gbuffer_pass"
 {
     Properties
     {
-        _MainTex ("Texture", 2D) = "white" {}
-
+        [NoScaleOffset] _MainTex ("Texture", 2D) = "white" {}
     }
     SubShader
     {
@@ -37,20 +36,22 @@ Shader "Hidden/gbuffer_pass"
                 return o;
             }
 
-            sampler2D _MainTex;
-            sampler2D _CameraDepthTexture;
+            sampler2D_float _MainTex;
+            sampler2D_float _CameraDepthNormalsTexture;
+            sampler2D_float _CameraDepthTexture;
 
-            fixed4 frag (float2 uv : TEXCOORD0) : SV_Target
+            float4 frag (float2 uv : TEXCOORD0) : SV_Target
             {
                 float depth = tex2D(_CameraDepthTexture, uv).r;
-                // depth = lerp(UNITY_NEAR_CLIP_VALUE, 1, depth);
+                
+                // переводим uv из (0, 1) в clip space
+                // uv --- координаты в пикселях
+                float4 prev_coord = float4(uv * 2.0 - 1.0, depth, 1.0);
 
-                // get coordinates using depth buffer
-                fixed4 prev_coord = fixed4(uv * 2.0 - 1.0, depth, 1.0);
-                fixed4 camera_position = mul(unity_CameraInvProjection, prev_coord);
-                // float kek = -(camera_position.z / camera_position.w) * 0.1;
-                // return fixed4(kek, kek, kek, 1.0);
-                return fixed4(camera_position.xyz / camera_position.w, 1.0);
+                // переводим из clip space во view space
+                float4 camera_position = mul(unity_CameraInvProjection, prev_coord);
+
+                return float4(camera_position.xyz / camera_position.w, 1.0);
             }
 
             ENDCG
