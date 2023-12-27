@@ -8,7 +8,7 @@ Shader "Hidden/ao_factor_pass"
     SubShader
     {
         // No culling or depth
-        Cull Off ZWrite Off ZTest Always
+        // Cull Off ZWrite Off ZTest Always
 
         Pass
         {
@@ -105,12 +105,12 @@ Shader "Hidden/ao_factor_pass"
                     }
                 }
                 
-                ao_factor /= (pow(diametr, 2) - 1) * 0.8;
+                ao_factor /= (pow(diametr, 2) - 1);
                 // return float4(ao_factor, ao_factor, ao_factor, 1.0);
 
-                ao_factor = 1 - ao_factor;
+                // ao_factor = 1 - ao_factor;
                 float4 color = tex2D(_MainTex, i.uv);
-                return color * (1 - ao_factor * 1.5);
+                return color * ao_factor * 1.5;
             }
             ENDCG
         }
