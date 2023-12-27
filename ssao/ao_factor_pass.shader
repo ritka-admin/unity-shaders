@@ -100,17 +100,17 @@ Shader "Hidden/ao_factor_pass"
                         float4 occluder = get_camera_position(neigh);
                         float3 diff = occluder - position;
                         float d = length(diff);
-                        ao_factor += max(dot(normal, normalize(diff)) + 0.25f, 0.0f) / (0.5f + d);
-                        // return occluder;
-                        // return fixed4(diff.xyz, 1.0);
-
+                        ao_factor += max(dot(normal, normalize(diff)) + 0.3f, 0.0f) / (0.5f + d);
                         // ao_factor += occluder.z > position.z ? 1.0 : 0.0;
                     }
                 }
                 
                 ao_factor /= (pow(diametr, 2) - 1) * 0.8;
-                // ao_factor = 1 - ao_factor;
-                return float4(ao_factor, ao_factor, ao_factor, 1.0);
+                // return float4(ao_factor, ao_factor, ao_factor, 1.0);
+
+                ao_factor = 1 - ao_factor;
+                float4 color = tex2D(_MainTex, i.uv);
+                return color * (1 - ao_factor * 1.5);
             }
             ENDCG
         }
