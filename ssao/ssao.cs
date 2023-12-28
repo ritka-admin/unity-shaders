@@ -24,14 +24,7 @@ public class ssao : MonoBehaviour
 
     void OnRenderImage (RenderTexture source, RenderTexture destination)
     {
-        // first pass: form gbuffer
-        // RenderTexture position_tex = new RenderTexture(source);
-        // RenderTexture position_tex = RenderTexture.GetTemporary(Screen.width, Screen.height, 32);
-        // Graphics.Blit(source, position_tex, gbuffer_shader);
-        // Graphics.Blit(source, destination, gbuffer_shader);
-
-        // second pass: form occlussion factor buffer
-        // RenderTexture ao_factor_tex = new RenderTexture(source);
+        RenderTexture ao_factor_tex = RenderTexture.GetTemporary(source.width, source.height, 0, RenderTextureFormat.ARGBFloat);
         ao_factor_pass.SetInt("n_samples", n_samples);
         Graphics.Blit(source, destination, ao_factor_pass);
     }
