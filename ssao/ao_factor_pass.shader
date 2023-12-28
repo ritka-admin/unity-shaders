@@ -44,12 +44,6 @@ Shader "Hidden/ao_factor_pass"
             sampler2D_float _MainTex;
             sampler2D_float _CameraDepthNormalsTexture;
             sampler2D_float _CameraDepthTexture;
-            float4 _CameraDepthNormalsTexture_TexelSize;
-            uniform float4 _MainTex_TexelSize;
-
-            float gen_random(float2 uv) {
-                return frac(sin(dot(uv,float2(12.9898,78.233)))*43758.5453123);
-            }
 
             float3 get_camera_position(float2 uv) {
                 float depth = tex2D(_CameraDepthTexture, uv).r;
