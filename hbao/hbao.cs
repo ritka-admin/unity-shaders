@@ -2,8 +2,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-
 [ExecuteInEditMode]
+[ImageEffectAllowedInSceneView]
 public class hbao : MonoBehaviour
 {
     [Range(2, 200)]

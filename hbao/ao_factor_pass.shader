@@ -7,6 +7,7 @@ Shader "Hidden/ao_factor_pass"
         rays_num ("rays_num", Range(10, 60)) = 10
         ray_steps_num ("ray_steps_num", Range(1, 100)) = 1
     }
+
     SubShader
     {
 
@@ -41,8 +42,8 @@ Shader "Hidden/ao_factor_pass"
             sampler2D_float _MainTex;
             sampler2D_float _CameraDepthNormalsTexture;
             sampler2D_float _CameraDepthTexture;
+            float4 _CameraDepthTexture_TexelSize;
 
-            // uniform float _Constant_PI;
             uniform int radius;
             uniform int rays_num;
             uniform int ray_steps_num;
@@ -60,51 +61,43 @@ Shader "Hidden/ao_factor_pass"
                 return camera_position.xyz / camera_position.w;
             }
 
-            float tangent(float3 P)
+            float tangent(float3 H)
             {
-                return P.z / length(P.xy);
+                return H.z / length(H.xy);
             }
 
             float4 frag (v2f i) : SV_Target
             {
+                float pi = 3.1415926;
                 float3 our_pos = get_camera_position(i.uv);
 
-                float angle_step = 2 * 3.1415926 / rays_num;
-                float march_step_pixels = floor(radius / (float) ray_steps_num + 0.5);
-                float2 march_step = float2(march_step_pixels / (float) _ScreenParams.x, march_step_pixels / (float) _ScreenParams.y);
-
                 float ao_factor = 0.0;
-                float cur_angle = 0.0; 
+                float cur_angle = 0.0;
+                float angle_step = 2 * 3.1415926 / rays_num;
 
                 for (int j = 0; j < rays_num; ++j) {
                     
-                    float x = cos(cur_angle);
-                    float y = sin(cur_angle);
-                    float2 cur_angle_dir = float2(x, y);
-                    float2 ray_step = cur_angle_dir * march_step; 
+                    float ray_max_angle = -pi / 2;
+                    float2 cur_angle_dir = float2(sin(cur_angle), cos(cur_angle)) * _CameraDepthTexture_TexelSize.xy * radius;	// radius with dir
                     
-                    float ray_max_angle = 0.0;
-                    float2 ray_cur_value = ray_step;
                     for (int k = 0; k < ray_steps_num; ++k) {
-
-                        float3 sample_pos = get_camera_position(i.uv + ray_cur_value);
+                        
+                        float offset = float(k) / ray_steps_num + 1.0 / radius;
+                        float3 sample_pos = get_camera_position(i.uv + cur_angle_dir * offset);
                         float3 horizon_vector = sample_pos - our_pos;
+
                         float tg = tangent(horizon_vector);
                         float h_angle = atan(tg);
 
-                        if (h_angle > ray_max_angle) {
-                            ray_max_angle = h_angle;
-                        }
-
-                        ray_cur_value += ray_step;
+                        ray_max_angle = max(h_angle, ray_max_angle);
                     }
                     
-                    ao_factor += ray_max_angle / (3.1415926 / 2);
+                    // pi/2 - max_angle not to (1 - ao_factor) later
+                    ao_factor += (pi - 2 * ray_max_angle) / pi;
                     cur_angle += angle_step;
                 }
 
                 ao_factor /= rays_num;
-                ao_factor = 1 - ao_factor;
 
                 return float4(ao_factor, ao_factor, ao_factor, 1.0);
             }
