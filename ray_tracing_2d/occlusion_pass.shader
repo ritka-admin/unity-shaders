@@ -3,6 +3,7 @@ Shader "Hidden/occlusion_pass"
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
+        SunSize ("SunSize", Range(0, 1.57)) = 0
     }
     SubShader
     {
@@ -35,6 +36,7 @@ Shader "Hidden/occlusion_pass"
                 return o;
             }
 
+            float SunSize;
             sampler2D _MainTex;
             float4 _MainTex_TexelSize;
             float4 _CameraDepthTexture_TexelSize;
@@ -49,7 +51,13 @@ Shader "Hidden/occlusion_pass"
                 if ((int) tex2D(_MainTex, i.uv).x == 0 || i.uv.x * _ScreenParams.x / _ScreenParams.y > 1.0) {
                     return float4(0.0, 0.0, 0.0, 1.0);
                 }
-            
+                
+                float3 sky_color = float3(0.5, 0.5, 0.5);
+                float3 sun_color = float3(1.0, 1.0, 1.0);
+                float2 sun_direction = normalize(-float2(-0.5, -0.5));
+                // float2 sun_position = float2(0.4, 0.6);
+                // float sun_radius = 0.35;
+
                 int rays_num = 360;
             
                 float3 light = float3(0.0, 0.0, 0.0);
@@ -80,7 +88,30 @@ Shader "Hidden/occlusion_pass"
                     }
 
                     if (k == steps) { //|| out_of_frame(cur_step) (if texture wrap_mode == repeat)
-                        light += light_color;
+                        
+                        // standard approach
+                        // light += sun_color;
+                        
+                        // point lightning
+                        // float2 res = clamp(cur_step, sun_position - sun_radius, sun_position + sun_radius);
+
+                        // if (res.x != cur_step.x && res.y != cur_step.y) {
+                        //     light += sky_color;
+                        // } else {
+                        //     light += sun_color;
+                        // }
+                        
+                        // dependance on direction (my)
+                        // float coef = dot(normalize(cur_step), sun_direction);
+                        // light += lerp(sky_color, sun_color, coef);
+
+                        // dependance on direction (Timur)
+                        light += sky_color;
+
+                        float coef = dot(normalize(cur_step), sun_direction);
+                        if (coef > SunSize) {
+                            light += sun_color;
+                        }
                     }
                     
                     cur_angle += angle_step;
