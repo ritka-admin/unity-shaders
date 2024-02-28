@@ -3,8 +3,8 @@ Shader "Hidden/occlusion_pass"
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
-        SunSize ("SunSize", Range(0, 1.57)) = 0
     }
+
     SubShader
     {
 
@@ -36,89 +36,93 @@ Shader "Hidden/occlusion_pass"
                 return o;
             }
 
+            int RaysNum;
             float SunSize;
+            float SkyIntensity;
+            float SunIntensity;
+            float SunDirectionX;
+            float SunDirectionY;
+
             sampler2D _MainTex;
             float4 _MainTex_TexelSize;
             float4 _CameraDepthTexture_TexelSize;
+            
+            int get_step(int total_steps, float2 cur_angle_dir, float2 uv) {
+                float2 cur_step = uv + cur_angle_dir;
+                float4 cur_step_color = tex2D(_MainTex, cur_step);
 
+                int k = 0;
 
-            bool out_of_frame(float2 pos) {
-                return pos.x < 0 || pos.y < 0 || pos.x * _ScreenParams.x/_ScreenParams.y > 1.0 || pos.y * _ScreenParams.y/_ScreenParams.x > 1.0;
+                [loop]
+                for (k; k < total_steps; ++k) {
+                    
+                    // если врезались во что-то -- break
+                    if (floor(cur_step_color.x) == 0)
+                    {
+                        break;
+                    }
+                    
+                    cur_step += cur_angle_dir;
+                    cur_step_color = tex2D(_MainTex, cur_step);
+                }
+
+                return k;
+            }
+
+            float ray_march(float cur_angle, float2 uv) {
+                float2 sun_direction = -float2(SunDirectionX, SunDirectionY);
+                float light = 0.0;
+
+                int steps = 400;
+                float2 cur_angle_dir = float2(sin(cur_angle), cos(cur_angle)) * _MainTex_TexelSize.xy;
+                int step = get_step(steps, cur_angle_dir, uv);
+
+                if (step == steps) {
+                    
+                    // standard approach
+                    // light += sun_color;
+                    
+                    // dependance on direction (my)
+                    // float coef = dot(normalize(cur_angle_dir), sun_direction);
+                    // light += lerp(SkyIntensity, SunIntensity, coef);
+
+                    // dependance on direction (Timur)
+                    light += SkyIntensity;
+
+                    float coef = dot(normalize(cur_angle_dir), normalize(sun_direction));
+                    if (coef > SunSize) {
+                        light += SunIntensity;
+                    }
+                }
+
+                return light;
+            }
+
+            float4 get_result(float2 uv) {
+                if (floor(tex2D(_MainTex, uv).x) == 0 || uv.x > 1.0) {
+                    return float4(0.0, 0.0, 0.0, 1.0);
+                }
+
+                float pi = 3.1415926;
+                float light = 0.0;
+                float3 light_color = float3(1.0, 1.0, 1.0);
+                float cur_angle = 0.0;
+                float angle_step = 2 * pi / RaysNum;
+                
+                [loop]
+                for (int j = 0; j < RaysNum; ++j) {
+                    light += ray_march(cur_angle, uv);
+                    cur_angle += angle_step;
+                }
+
+                light /= RaysNum;
+                return float4(light, light, light, 1.0);
             }
 
             float4 frag (v2f i) : SV_Target
             {
-                if ((int) tex2D(_MainTex, i.uv).x == 0 || i.uv.x * _ScreenParams.x / _ScreenParams.y > 1.0) {
-                    return float4(0.0, 0.0, 0.0, 1.0);
-                }
-                
-                float3 sky_color = float3(0.5, 0.5, 0.5);
-                float3 sun_color = float3(1.0, 1.0, 1.0);
-                float2 sun_direction = normalize(-float2(-0.5, -0.5));
-                // float2 sun_position = float2(0.4, 0.6);
-                // float sun_radius = 0.35;
-
-                int rays_num = 360;
-            
-                float3 light = float3(0.0, 0.0, 0.0);
-                float3 light_color = float3(1.0, 1.0, 1.0);
-                float cur_angle = 0.0;
-                float angle_step = 2 * 3.1415926 / rays_num;
-
-                for (int j = 0; j < rays_num; ++j) {
-                    
-                    float2 cur_angle_dir = float2(sin(cur_angle), cos(cur_angle)) * _MainTex_TexelSize.xy;
-                    float2 cur_step = i.uv + cur_angle_dir;
-                    float4 cur_step_color = tex2D(_MainTex, cur_step);
-                    
-                    int steps = 400;
-                    int k = 0;
-
-                    [loop]
-                    for (k; k < steps; ++k) {
-                        
-                        // если врезались во что-то -- break
-                        if ((int) cur_step_color.x == 0) // || out_of_frame(cur_step) (if texture wrap_mode == repeat)
-                        {
-                            break;
-                        }
-                        
-                        cur_step += cur_angle_dir;
-                        cur_step_color = tex2D(_MainTex, cur_step);
-                    }
-
-                    if (k == steps) { //|| out_of_frame(cur_step) (if texture wrap_mode == repeat)
-                        
-                        // standard approach
-                        // light += sun_color;
-                        
-                        // point lightning
-                        // float2 res = clamp(cur_step, sun_position - sun_radius, sun_position + sun_radius);
-
-                        // if (res.x != cur_step.x && res.y != cur_step.y) {
-                        //     light += sky_color;
-                        // } else {
-                        //     light += sun_color;
-                        // }
-                        
-                        // dependance on direction (my)
-                        // float coef = dot(normalize(cur_step), sun_direction);
-                        // light += lerp(sky_color, sun_color, coef);
-
-                        // dependance on direction (Timur)
-                        light += sky_color;
-
-                        float coef = dot(normalize(cur_step), sun_direction);
-                        if (coef > SunSize) {
-                            light += sun_color;
-                        }
-                    }
-                    
-                    cur_angle += angle_step;
-                }
-
-                light /= rays_num;
-                return float4(light.xyz, 1.0);
+                i.uv.x *= _ScreenParams.x/_ScreenParams.y;
+                return get_result(i.uv);
             }
             
             ENDCG
