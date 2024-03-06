@@ -35,7 +35,9 @@ Shader "Hidden/zero_cascade_pass"
                 o.uv = v.uv;
                 return o;
             }
-            
+
+            // float bias;
+            //
             int W;
             int DirectionCount;
             float SunSize;
@@ -43,16 +45,15 @@ Shader "Hidden/zero_cascade_pass"
             float SunIntensity;
             float SunDirectionX;
             float SunDirectionY;
-
+            
             sampler2D _Source;
             sampler2D _MainTex;
-            float4 _Source_TexelSize;
             float4 _MainTex_TexelSize;
-            float4 _CameraDepthTexture_TexelSize;
             
-            int get_step(int total_steps, float2 cur_angle_dir, float2 source_uv) {
+            int get_step(int total_steps, float2 cur_angle_dir, float2 source_uv) 
+            {
                 float2 cur_step = source_uv + cur_angle_dir;
-                float4 cur_step_color = tex2D(_Source, cur_step);
+                float4 cur_step_color = tex2D(_MainTex, cur_step);
 
                 int k = 0;
 
@@ -66,18 +67,19 @@ Shader "Hidden/zero_cascade_pass"
                     }
                     
                     cur_step += cur_angle_dir;
-                    cur_step_color = tex2D(_Source, cur_step);
+                    cur_step_color = tex2D(_MainTex, cur_step);
                 }
 
                 return k;
             }
 
-            float ray_march(float cur_angle, float2 source_uv) {
+            float ray_march(float cur_angle, float2 source_uv) 
+            {
                 float2 sun_direction = -float2(SunDirectionX, SunDirectionY);
                 float light = 0.0;
 
                 int steps = 400;
-                float2 cur_angle_dir = float2(sin(cur_angle), cos(cur_angle)) * _Source_TexelSize.xy;
+                float2 cur_angle_dir = float2(sin(cur_angle), cos(cur_angle)) * _MainTex_TexelSize.xy;
                 int step = get_step(steps, cur_angle_dir, source_uv);
 
                 if (step == steps) {
@@ -97,24 +99,34 @@ Shader "Hidden/zero_cascade_pass"
                 return light;
             }
 
-            float get_result(float2 uv, float2 source_uv) {
+            float get_result(float2 uv, float2 source_uv) 
+            {
                 float pi = 3.1415926;
 
-                int angle_idx = floor(uv.x * DirectionCount);
-                float cur_angle = angle_idx/float(DirectionCount) * 2.0 * pi;;
+                float angle_idx = floor(uv.x * DirectionCount);
+                float cur_angle = (2 * pi / DirectionCount) * angle_idx;
                 
                 return ray_march(cur_angle, source_uv);
             }
 
-            float frag (v2f i) : SV_Target
+            float4 frag (v2f i) : SV_Target
             {
-                float square_n = floor(i.uv.x / DirectionCount) + 1;
+                int square_n = floor(i.uv.x * DirectionCount);
+
+
                 float2 source_tex_coord = float2(
-                    i.uv.x * float(DirectionCount) / square_n,
+                    (i.uv.x - float(W) / float(_MainTex_TexelSize.z) * square_n) * float(DirectionCount),
                     i.uv.y
                 );
                 
-                return get_result(i.uv, source_tex_coord);
+                // float2 square_coordinates = float2(i.uv.x - float(W) / float(_MainTex_TexelSize.z) * square_n , i.uv.y);
+                // return float4(source_tex_coord, square_n /float(DirectionCount), 1.0);
+                
+                // return tex2D(_MainTex, square_coordinates * float2(DirectionCount, 1.0));
+
+                return tex2D(_Source, source_tex_coord);
+
+                // return get_result(i.uv, source_tex_coord);
             }
             
             ENDCG
