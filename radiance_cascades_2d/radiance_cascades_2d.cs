@@ -44,7 +44,7 @@ public class radiance_cascades_2d : MonoBehaviour
         // textures
         OcclusionTexture = Resources.Load<Texture2D>("occlusion");
 
-        RenderTexture RadianceTexture = RenderTexture.GetTemporary(W * directionCount, W, 0, RenderTextureFormat.ARGBFloat);
+        RenderTexture RadianceTexture = RenderTexture.GetTemporary(W * directionCount, W, 0, RenderTextureFormat.RFloat);
         RadianceTexture.filterMode = FilterMode.Bilinear;
 
         // uniforms first pass

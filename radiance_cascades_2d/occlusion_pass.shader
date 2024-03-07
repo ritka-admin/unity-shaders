@@ -55,7 +55,6 @@ Shader "Hidden/occlusion_pass"
                 [loop]
                 for (int j = 1; j <= DirectionCount; ++j) {
                     float2 square_coord = float2(
-                        // (i.uv.x - i.uv.x * (DirectionCount - square_n - 1) / DirectionCount),
                         i.uv.x / DirectionCount + float(W) / _RadianceTex_TexelSize.z * j,
                         i.uv.y
                     );
