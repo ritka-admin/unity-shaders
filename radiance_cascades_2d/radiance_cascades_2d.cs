@@ -10,10 +10,10 @@ public class radiance_cascades_2d : MonoBehaviour
     private Material occlusion_pass;
     private Texture2D OcclusionTexture;
 
-    [Range(128, 512)]
+    // [Range(128, 512)]
     public int W = 256;
 
-    [Range(4, 60)]
+    [Range(4, 100)]
     public int directionCount = 4;
 
     [Range(1, 90)]
@@ -47,12 +47,9 @@ public class radiance_cascades_2d : MonoBehaviour
         RenderTexture RadianceTexture = RenderTexture.GetTemporary(W * directionCount, W, 0, RenderTextureFormat.ARGBFloat);
         RadianceTexture.filterMode = FilterMode.Bilinear;
 
-        RenderTexture helperTexture = new RenderTexture(RadianceTexture);
-
         // uniforms first pass
-        zero_cascade_pass.SetTexture("_Source", OcclusionTexture);
-        // zero_cascade_pass.SetFloat("bias", bias);
         zero_cascade_pass.SetInt("W", W);
+        zero_cascade_pass.SetFloat("OutputTexWidth", RadianceTexture.width);
         zero_cascade_pass.SetInt("DirectionCount", directionCount);
         zero_cascade_pass.SetFloat("SkyIntensity", skyIntensity);
         zero_cascade_pass.SetFloat("SunDirectionX", sunDirectionX);
@@ -60,17 +57,16 @@ public class radiance_cascades_2d : MonoBehaviour
         zero_cascade_pass.SetFloat("SunSize", Mathf.Cos(Mathf.Deg2Rad * sunSize));
         zero_cascade_pass.SetFloat("SunIntensity", sunIntensity * 360 / sunSize);
 
-        Graphics.Blit(helperTexture, RadianceTexture, zero_cascade_pass);
+        Graphics.Blit(OcclusionTexture, RadianceTexture, zero_cascade_pass);
 
         // uniforms second pass
         occlusion_pass.SetTexture("_RadianceTex", RadianceTexture);
         occlusion_pass.SetInt("DirectionCount", directionCount);
         occlusion_pass.SetInt("W", W);
 
-        // destination.width = radianceTexture.width;
-        // destination.height = radianceTexture.height;
-
         Graphics.Blit(OcclusionTexture, destination, occlusion_pass);
+
+        // release textures
         RenderTexture.ReleaseTemporary(RadianceTexture);
     }
 }

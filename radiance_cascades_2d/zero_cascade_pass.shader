@@ -36,8 +36,6 @@ Shader "Hidden/zero_cascade_pass"
                 return o;
             }
 
-            // float bias;
-            //
             int W;
             int DirectionCount;
             float SunSize;
@@ -45,8 +43,8 @@ Shader "Hidden/zero_cascade_pass"
             float SunIntensity;
             float SunDirectionX;
             float SunDirectionY;
+            float OutputTexWidth;
             
-            sampler2D _Source;
             sampler2D _MainTex;
             float4 _MainTex_TexelSize;
             
@@ -113,20 +111,20 @@ Shader "Hidden/zero_cascade_pass"
             {
                 int square_n = floor(i.uv.x * DirectionCount);
 
-
                 float2 source_tex_coord = float2(
-                    (i.uv.x - float(W) / float(_MainTex_TexelSize.z) * square_n) * float(DirectionCount),
+                    (i.uv.x - float(W) / OutputTexWidth * square_n) * float(DirectionCount),
                     i.uv.y
                 );
                 
-                // float2 square_coordinates = float2(i.uv.x - float(W) / float(_MainTex_TexelSize.z) * square_n , i.uv.y);
+                // debug
+                
+                // 1 
                 // return float4(source_tex_coord, square_n /float(DirectionCount), 1.0);
                 
-                // return tex2D(_MainTex, square_coordinates * float2(DirectionCount, 1.0));
+                // 2
+                // return tex2D(_MainTex, source_tex_coord);
 
-                return tex2D(_Source, source_tex_coord);
-
-                // return get_result(i.uv, source_tex_coord);
+                return get_result(i.uv, source_tex_coord);
             }
             
             ENDCG
