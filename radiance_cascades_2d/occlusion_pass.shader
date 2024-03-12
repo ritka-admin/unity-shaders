@@ -52,12 +52,22 @@ Shader "Hidden/occlusion_pass"
 
                 float res = 0.0;
 
+                float half_pixels = _MainTex_TexelSize.z / (float(W * 2));
+                float half_coordinates = half_pixels / _MainTex_TexelSize.z;
+
+                i.uv.x = clamp(i.uv.x, half_coordinates, half_coordinates * (W * 2 - 1));
+
                 [loop]
                 for (int j = 1; j <= DirectionCount; ++j) {
+
+                    float rad_coord_x = i.uv.x / DirectionCount + float(W) / _RadianceTex_TexelSize.z * j;
+
                     float2 square_coord = float2(
-                        i.uv.x / DirectionCount + float(W) / _RadianceTex_TexelSize.z * j,
+                        // i.uv.x / DirectionCount + float(W) / _RadianceTex_TexelSize.z * j,
+                        rad_coord_x,
                         i.uv.y
                     );
+
                     res += tex2D(_RadianceTex, square_coord).r;
                 }
 

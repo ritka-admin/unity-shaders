@@ -112,7 +112,8 @@ Shader "Hidden/zero_cascade_pass"
                 int square_n = floor(i.uv.x * DirectionCount);
 
                 float2 source_tex_coord = float2(
-                    (i.uv.x - float(W) / OutputTexWidth * square_n) * float(DirectionCount),
+                    // (i.uv.x - float(W) / OutputTexWidth * square_n) * float(DirectionCount),
+                    modf(i.uv.x * DirectionCount, square_n),
                     i.uv.y
                 );
                 

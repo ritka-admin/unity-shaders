@@ -10,7 +10,7 @@ public class radiance_cascades_2d : MonoBehaviour
     private Material occlusion_pass;
     private Texture2D OcclusionTexture;
 
-    // [Range(128, 512)]
+    [Range(0, 256)]
     public int W = 256;
 
     [Range(4, 100)]
@@ -31,9 +31,6 @@ public class radiance_cascades_2d : MonoBehaviour
     [Range(-1, 1)]
     public float sunDirectionY = -0.5f;
 
-    [Range(0, 2)]
-    public float bias = 1;
-
 
     void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
@@ -46,6 +43,7 @@ public class radiance_cascades_2d : MonoBehaviour
 
         RenderTexture RadianceTexture = RenderTexture.GetTemporary(W * directionCount, W, 0, RenderTextureFormat.RFloat);
         RadianceTexture.filterMode = FilterMode.Bilinear;
+        RadianceTexture.wrapMode = TextureWrapMode.Clamp;
 
         // uniforms first pass
         zero_cascade_pass.SetInt("W", W);
