@@ -25,11 +25,8 @@ public class radiance_cascades_2d : MonoBehaviour
     [Range(0, 1)]
     public float sunIntensity = 1;
 
-    [Range(-1, 1)]
-    public float sunDirectionX = -0.5f;
-
-    [Range(-1, 1)]
-    public float sunDirectionY = -0.5f;
+    [Range(0, 350)]
+    public float sunAngle = 0;
 
 
     void OnRenderImage(RenderTexture source, RenderTexture destination)
@@ -50,8 +47,8 @@ public class radiance_cascades_2d : MonoBehaviour
         zero_cascade_pass.SetFloat("OutputTexWidth", RadianceTexture.width);
         zero_cascade_pass.SetInt("DirectionCount", directionCount);
         zero_cascade_pass.SetFloat("SkyIntensity", skyIntensity);
-        zero_cascade_pass.SetFloat("SunDirectionX", sunDirectionX);
-        zero_cascade_pass.SetFloat("SunDirectionY", sunDirectionY);
+        zero_cascade_pass.SetFloat("SunDirectionX", Mathf.Cos(Mathf.Deg2Rad * sunAngle));
+        zero_cascade_pass.SetFloat("SunDirectionY", Mathf.Sin(Mathf.Deg2Rad * sunAngle));
         zero_cascade_pass.SetFloat("SunSize", Mathf.Cos(Mathf.Deg2Rad * sunSize));
         zero_cascade_pass.SetFloat("SunIntensity", sunIntensity * 360 / sunSize);
 

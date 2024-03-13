@@ -47,10 +47,23 @@ Shader "Hidden/zero_cascade_pass"
             
             sampler2D _MainTex;
             float4 _MainTex_TexelSize;
-            
-            int get_step(int total_steps, float2 cur_angle_dir, float2 source_uv) 
+
+            float get_light(float2 cur_angle_dir)
             {
-                float2 cur_step = source_uv + cur_angle_dir;
+                float2 sun_direction = -float2(SunDirectionX, SunDirectionY);
+                float light = SkyIntensity;
+
+                float coef = dot(normalize(cur_angle_dir), normalize(sun_direction));
+                if (coef > SunSize) {
+                    light += SunIntensity;
+                }
+                
+                return light;
+            }
+
+            bool ray_intersecs_scene(float2 pos, float2 dir) {
+                int total_steps = 400;
+                float2 cur_step = pos + dir;
                 float4 cur_step_color = tex2D(_MainTex, cur_step);
 
                 int k = 0;
@@ -58,50 +71,32 @@ Shader "Hidden/zero_cascade_pass"
                 [loop]
                 for (k; k < total_steps; ++k) {
                     
-                    // если врезались во что-то -- break
                     if (floor(cur_step_color.x) == 0)
                     {
-                        break;
+                        return true;
                     }
                     
-                    cur_step += cur_angle_dir;
+                    cur_step += dir;
                     cur_step_color = tex2D(_MainTex, cur_step);
                 }
 
-                return k;
+                return false;
             }
 
             float ray_march(float cur_angle, float2 source_uv) 
             {
-                float2 sun_direction = -float2(SunDirectionX, SunDirectionY);
-                float light = 0.0;
-
-                int steps = 400;
                 float2 cur_angle_dir = float2(sin(cur_angle), cos(cur_angle)) * _MainTex_TexelSize.xy;
-                int step = get_step(steps, cur_angle_dir, source_uv);
 
-                if (step == steps) {
-                    
-                    // standard approach
-                    // light += SunIntensity;
-
-                    // dependance on direction
-                    light += SkyIntensity;
-
-                    float coef = dot(normalize(cur_angle_dir), normalize(sun_direction));
-                    if (coef > SunSize) {
-                        light += SunIntensity;
-                    }
+                if (ray_intersecs_scene(source_uv, cur_angle_dir)) {
+                    return 0.0;
                 }
 
-                return light;
+                return get_light(cur_angle_dir);
             }
 
-            float get_result(float2 uv, float2 source_uv) 
+            float get_result(float2 source_uv, int angle_idx) 
             {
                 float pi = 3.1415926;
-
-                float angle_idx = floor(uv.x * DirectionCount);
                 float cur_angle = (2 * pi / DirectionCount) * angle_idx;
                 
                 return ray_march(cur_angle, source_uv);
@@ -109,11 +104,11 @@ Shader "Hidden/zero_cascade_pass"
 
             float4 frag (v2f i) : SV_Target
             {
-                int square_n = floor(i.uv.x * DirectionCount);
+                int angle_idx = floor(i.uv.x * DirectionCount);
 
                 float2 source_tex_coord = float2(
-                    // (i.uv.x - float(W) / OutputTexWidth * square_n) * float(DirectionCount),
-                    modf(i.uv.x * DirectionCount, square_n),
+                    // (i.uv.x - float(W) / OutputTexWidth * angle_idx) * float(DirectionCount),
+                    modf(i.uv.x * DirectionCount, angle_idx),
                     i.uv.y
                 );
                 
@@ -125,7 +120,7 @@ Shader "Hidden/zero_cascade_pass"
                 // 2
                 // return tex2D(_MainTex, source_tex_coord);
 
-                return get_result(i.uv, source_tex_coord);
+                return get_result(source_tex_coord, angle_idx);
             }
             
             ENDCG
