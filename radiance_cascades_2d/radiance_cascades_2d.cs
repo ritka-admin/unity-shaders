@@ -6,15 +6,15 @@ using UnityEngine;
 [ImageEffectAllowedInSceneView]
 public class radiance_cascades_2d : MonoBehaviour
 {
-    private Material zero_cascade_pass;
+    private Material cascade_pass;
     private Material occlusion_pass;
     private Texture2D OcclusionTexture;
 
-    [Range(0, 256)]
-    public int W = 256;
+    [Range(0, 512)]
+    public int zeroW = 256;
 
     [Range(4, 100)]
-    public int directionCount = 4;
+    public int zeroDirectionCount = 4;
 
     [Range(1, 90)]
     public float sunSize = 20;
@@ -25,43 +25,58 @@ public class radiance_cascades_2d : MonoBehaviour
     [Range(0, 1)]
     public float sunIntensity = 1;
 
-    [Range(0, 350)]
+    [Range(0, 360)]
     public float sunAngle = 0;
 
 
     void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
-        // shaders
-        zero_cascade_pass = new Material( Shader.Find("Hidden/zero_cascade_pass") );
+
+        cascade_pass = new Material( Shader.Find("Hidden/cascade_pass") );
         occlusion_pass = new Material( Shader.Find("Hidden/occlusion_pass") );
 
-        // textures
         OcclusionTexture = Resources.Load<Texture2D>("occlusion");
 
-        RenderTexture RadianceTexture = RenderTexture.GetTemporary(W * directionCount, W, 0, RenderTextureFormat.RFloat);
-        RadianceTexture.filterMode = FilterMode.Bilinear;
-        RadianceTexture.wrapMode = TextureWrapMode.Clamp;
+        // fill and merge all cascades
+        int nCascades = 8;
+        RenderTexture PrevCascade = null;
 
-        // uniforms first pass
-        zero_cascade_pass.SetInt("W", W);
-        zero_cascade_pass.SetFloat("OutputTexWidth", RadianceTexture.width);
-        zero_cascade_pass.SetInt("DirectionCount", directionCount);
-        zero_cascade_pass.SetFloat("SkyIntensity", skyIntensity);
-        zero_cascade_pass.SetFloat("SunDirectionX", Mathf.Cos(Mathf.Deg2Rad * sunAngle));
-        zero_cascade_pass.SetFloat("SunDirectionY", Mathf.Sin(Mathf.Deg2Rad * sunAngle));
-        zero_cascade_pass.SetFloat("SunSize", Mathf.Cos(Mathf.Deg2Rad * sunSize));
-        zero_cascade_pass.SetFloat("SunIntensity", sunIntensity * 360 / sunSize);
+        for (int i = nCascades - 1; i >= 0; --i) 
+        {
+            int curW = zeroW >> i;
+            int curD = zeroDirectionCount << i;
 
-        Graphics.Blit(OcclusionTexture, RadianceTexture, zero_cascade_pass);
+            // Debug.Log(i + " , w:" + curW + ", d: " + curD);
 
-        // uniforms second pass
-        occlusion_pass.SetTexture("_RadianceTex", RadianceTexture);
-        occlusion_pass.SetInt("DirectionCount", directionCount);
-        occlusion_pass.SetInt("W", W);
+            RenderTexture RadianceTexture = RenderTexture.GetTemporary(curW * curD, curW, 0, RenderTextureFormat.RFloat);
+            RadianceTexture.filterMode = FilterMode.Bilinear;
+            RadianceTexture.wrapMode = TextureWrapMode.Clamp;
+
+            cascade_pass.SetTexture("_PrevCascade", PrevCascade);
+            cascade_pass.SetInt("NCascades", nCascades);
+            cascade_pass.SetInt("CurCascade", i);       // TODO
+            cascade_pass.SetInt("W", curW);
+            cascade_pass.SetInt("DirectionCount", curD);
+            cascade_pass.SetFloat("OutputTexWidth", RadianceTexture.width);
+            cascade_pass.SetFloat("SkyIntensity", skyIntensity);
+            cascade_pass.SetFloat("SunDirectionX", Mathf.Cos(Mathf.Deg2Rad * sunAngle));
+            cascade_pass.SetFloat("SunDirectionY", Mathf.Sin(Mathf.Deg2Rad * sunAngle));
+            cascade_pass.SetFloat("SunSize", Mathf.Cos(Mathf.Deg2Rad * sunSize));
+            cascade_pass.SetFloat("SunIntensity", sunIntensity * 360 / sunSize);
+
+            Graphics.Blit(OcclusionTexture, RadianceTexture, cascade_pass);
+            RenderTexture.ReleaseTemporary(PrevCascade);
+            PrevCascade = RadianceTexture;
+        }
+
+        // uniforms occlusion pass
+        occlusion_pass.SetTexture("_RadianceTex", PrevCascade);
+        occlusion_pass.SetInt("DirectionCount", zeroDirectionCount);
+        occlusion_pass.SetInt("W", zeroW);
 
         Graphics.Blit(OcclusionTexture, destination, occlusion_pass);
 
         // release textures
-        RenderTexture.ReleaseTemporary(RadianceTexture);
+        RenderTexture.ReleaseTemporary(PrevCascade);
     }
 }

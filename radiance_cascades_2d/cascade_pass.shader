@@ -1,4 +1,4 @@
-Shader "Hidden/zero_cascade_pass"
+Shader "Hidden/cascade_pass"
 {
     Properties
     {
@@ -35,7 +35,10 @@ Shader "Hidden/zero_cascade_pass"
                 o.uv = v.uv;
                 return o;
             }
-
+            
+            int CurCascade;
+            int NCascades;
+            //
             int W;
             int DirectionCount;
             float SunSize;
@@ -46,7 +49,9 @@ Shader "Hidden/zero_cascade_pass"
             float OutputTexWidth;
             
             sampler2D _MainTex;
+            sampler2D _PrevCascade;
             float4 _MainTex_TexelSize;
+            float4 _PrevCascade_TexelSize;
 
             float get_light(float2 cur_angle_dir)
             {
@@ -62,9 +67,21 @@ Shader "Hidden/zero_cascade_pass"
             }
 
             bool ray_intersecs_scene(float2 pos, float2 dir) {
-                int total_steps = 400;
-                float2 cur_step = pos + dir;
-                float4 cur_step_color = tex2D(_MainTex, cur_step);
+                // Промежуток, на котором трекаем луч: ( 2^CurCascade, 2^(CurCascade + 1) ]
+                // 1-й каскад -- 8 пикселей вокруг, 2-ый -- 16 и тд
+                int total_steps = CurCascade == 0 ? 1 << 3 : 1 << (3 + CurCascade);
+                // int total_steps = 100;
+                float2 start_step = CurCascade == 0 ? pos + dir : pos + (dir * (1 << 3) * (1 << CurCascade - 1));
+                float4 cur_step_color = tex2D(_MainTex, start_step);
+
+                // int total_steps = 200 * CurCascade;
+                // float2 start_step = pos + (dir * (1 << 2 * (CurCascade - 1)));
+                // float2 end_step = pos + (dir * (1 << 2 * CurCascade));
+                // float4 cur_step_color = tex2D(_MainTex, start_step);
+
+                // float2 start_step = pos + dir;
+                // int total_steps = 400;
+                // float4 cur_step_color = tex2D(_MainTex, start_step);
 
                 int k = 0;
 
@@ -76,8 +93,8 @@ Shader "Hidden/zero_cascade_pass"
                         return true;
                     }
                     
-                    cur_step += dir;
-                    cur_step_color = tex2D(_MainTex, cur_step);
+                    start_step += dir;
+                    cur_step_color = tex2D(_MainTex, start_step);
                 }
 
                 return false;
@@ -98,6 +115,8 @@ Shader "Hidden/zero_cascade_pass"
             {
                 float pi = 3.1415926;
                 float cur_angle = (2 * pi / DirectionCount) * angle_idx;
+                // смещение
+                cur_angle += cur_angle / 2;
                 
                 return ray_march(cur_angle, source_uv);
             }
@@ -107,20 +126,37 @@ Shader "Hidden/zero_cascade_pass"
                 int angle_idx = floor(i.uv.x * DirectionCount);
 
                 float2 source_tex_coord = float2(
-                    // (i.uv.x - float(W) / OutputTexWidth * angle_idx) * float(DirectionCount),
+                    // (i.uv.x - float(W) / OutputTexWidth * square_n) * float(DirectionCount),
                     modf(i.uv.x * DirectionCount, angle_idx),
                     i.uv.y
                 );
                 
-                // debug
+                // текущий результат не нужен ни за чем, кроме того, чтобы определить, пересекается ли текущий луч с чем-то...?
+                float result = get_result(source_tex_coord, angle_idx);
                 
-                // 1 
-                // return float4(source_tex_coord, square_n /float(DirectionCount), 1.0);
-                
-                // 2
-                // return tex2D(_MainTex, source_tex_coord);
+                // если пересеклись или на последнем каскаде -- возвращаем значение
+                if (CurCascade == NCascades - 1 || floor(result) == 0.0) {
+                    return result;
+                }
 
-                return get_result(source_tex_coord, angle_idx);
+                result = 0.0;
+                int prev_rays = 2;
+                // если нет -- забираем значение из предыдущего каскада: выбираем нужные направления и по ним усредняем
+                for (int j = 1; j <= prev_rays; ++j) {       // TODO
+                    
+                    int prev_d = DirectionCount * 2;
+                    int prev_w = W / 2;
+                    float2 square_coord = float2(
+                        source_tex_coord.x / prev_d + prev_w / _PrevCascade_TexelSize.z * (angle_idx + 1) * j,
+                        i.uv.y
+                    );
+
+                    result += tex2D(_PrevCascade, square_coord).r;
+
+                }
+
+                result /= prev_rays;
+                return result;
             }
             
             ENDCG
