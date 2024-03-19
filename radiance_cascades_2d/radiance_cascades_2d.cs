@@ -36,9 +36,10 @@ public class radiance_cascades_2d : MonoBehaviour
         occlusion_pass = new Material( Shader.Find("Hidden/occlusion_pass") );
 
         OcclusionTexture = Resources.Load<Texture2D>("occlusion");
+        OcclusionTexture.wrapMode = TextureWrapMode.Clamp;
 
         // fill and merge all cascades
-        int nCascades = 8;
+        int nCascades = 7;
         RenderTexture PrevCascade = null;
 
         for (int i = nCascades - 1; i >= 0; --i) 
@@ -54,7 +55,7 @@ public class radiance_cascades_2d : MonoBehaviour
 
             cascade_pass.SetTexture("_PrevCascade", PrevCascade);
             cascade_pass.SetInt("NCascades", nCascades);
-            cascade_pass.SetInt("CurCascade", i);       // TODO
+            cascade_pass.SetInt("CurCascade", i);
             cascade_pass.SetInt("W", curW);
             cascade_pass.SetInt("DirectionCount", curD);
             cascade_pass.SetFloat("OutputTexWidth", RadianceTexture.width);

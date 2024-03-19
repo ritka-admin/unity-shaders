@@ -70,18 +70,8 @@ Shader "Hidden/cascade_pass"
                 // Промежуток, на котором трекаем луч: ( 2^CurCascade, 2^(CurCascade + 1) ]
                 // 1-й каскад -- 8 пикселей вокруг, 2-ый -- 16 и тд
                 int total_steps = CurCascade == 0 ? 1 << 3 : 1 << (3 + CurCascade);
-                // int total_steps = 100;
                 float2 start_step = CurCascade == 0 ? pos + dir : pos + (dir * (1 << 3) * (1 << CurCascade - 1));
                 float4 cur_step_color = tex2D(_MainTex, start_step);
-
-                // int total_steps = 200 * CurCascade;
-                // float2 start_step = pos + (dir * (1 << 2 * (CurCascade - 1)));
-                // float2 end_step = pos + (dir * (1 << 2 * CurCascade));
-                // float4 cur_step_color = tex2D(_MainTex, start_step);
-
-                // float2 start_step = pos + dir;
-                // int total_steps = 400;
-                // float4 cur_step_color = tex2D(_MainTex, start_step);
 
                 int k = 0;
 
@@ -121,34 +111,22 @@ Shader "Hidden/cascade_pass"
                 return ray_march(cur_angle, source_uv);
             }
 
-            float4 frag (v2f i) : SV_Target
-            {
-                int angle_idx = floor(i.uv.x * DirectionCount);
-
-                float2 source_tex_coord = float2(
-                    // (i.uv.x - float(W) / OutputTexWidth * square_n) * float(DirectionCount),
-                    modf(i.uv.x * DirectionCount, angle_idx),
-                    i.uv.y
-                );
-                
-                // текущий результат не нужен ни за чем, кроме того, чтобы определить, пересекается ли текущий луч с чем-то...?
-                float result = get_result(source_tex_coord, angle_idx);
-                
-                // если пересеклись или на последнем каскаде -- возвращаем значение
-                if (CurCascade == NCascades - 1 || floor(result) == 0.0) {
-                    return result;
-                }
-
-                result = 0.0;
+            float merge_with_prev(float2 uv, float2 source_tex_coord, float angle_idx) {
+                float result = 0.0;
                 int prev_rays = 2;
-                // если нет -- забираем значение из предыдущего каскада: выбираем нужные направления и по ним усредняем
-                for (int j = 1; j <= prev_rays; ++j) {       // TODO
+                int prev_w = W >> 1;
+                int prev_d = DirectionCount << 1;
+
+                float w_half_pixels = _MainTex_TexelSize.z / (float(prev_w * 2));
+                float w_half_coordinates = w_half_pixels / _MainTex_TexelSize.z;
+                source_tex_coord.x = clamp(source_tex_coord.x, w_half_coordinates, w_half_coordinates * (prev_w * 2 - 1));
+
+                for (int j = 1; j <= prev_rays; ++j) {
                     
-                    int prev_d = DirectionCount * 2;
-                    int prev_w = W / 2;
+                    int dir_n = angle_idx * 2 + (j-1);
                     float2 square_coord = float2(
-                        source_tex_coord.x / prev_d + prev_w / _PrevCascade_TexelSize.z * (angle_idx + 1) * j,
-                        i.uv.y
+                        source_tex_coord.x / prev_d + prev_w / _PrevCascade_TexelSize.z * dir_n,
+                        uv.y
                     );
 
                     result += tex2D(_PrevCascade, square_coord).r;
@@ -157,6 +135,26 @@ Shader "Hidden/cascade_pass"
 
                 result /= prev_rays;
                 return result;
+            }
+
+            float frag (v2f i) : SV_Target
+            {
+                int angle_idx = floor(i.uv.x * DirectionCount);
+
+                float2 source_tex_coord = float2(
+                    // (i.uv.x - float(W) / OutputTexWidth * angle_idx) * float(DirectionCount),
+                    modf(i.uv.x * DirectionCount, angle_idx),
+                    i.uv.y
+                );
+                
+                float result = get_result(source_tex_coord, angle_idx);
+                
+                // если пересеклись или на последнем каскаде -- возвращаем значение
+                if (CurCascade == NCascades - 1 || result == 0.0) {
+                    return result;
+                }
+
+                return merge_with_prev(i.uv, source_tex_coord, angle_idx);
             }
             
             ENDCG
