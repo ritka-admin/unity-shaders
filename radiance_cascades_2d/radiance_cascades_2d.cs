@@ -16,11 +16,20 @@ public class radiance_cascades_2d : MonoBehaviour
     [Range(4, 100)]
     public int zeroDirectionCount = 4;
 
-    [Range(1, 90)]
-    public float sunSize = 20;
+    [Range(2, 7)]
+    public int zeroIntervalPow = 3;
+
+    [Range(2, 4)]
+    public int branchFactor = 2;    
+
+    [Range(1, 9)]
+    public int nCascades = 5;
 
     [Range(0, 1)]
     public float skyIntensity = 0;
+
+    [Range(1, 90)]
+    public float sunSize = 20;
 
     [Range(0, 1)]
     public float sunIntensity = 1;
@@ -28,10 +37,8 @@ public class radiance_cascades_2d : MonoBehaviour
     [Range(0, 360)]
     public float sunAngle = 0;
 
-
     void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
-
         cascade_pass = new Material( Shader.Find("Hidden/cascade_pass") );
         occlusion_pass = new Material( Shader.Find("Hidden/occlusion_pass") );
 
@@ -39,13 +46,12 @@ public class radiance_cascades_2d : MonoBehaviour
         OcclusionTexture.wrapMode = TextureWrapMode.Clamp;
 
         // fill and merge all cascades
-        int nCascades = 7;
         RenderTexture PrevCascade = null;
 
         for (int i = nCascades - 1; i >= 0; --i) 
         {
             int curW = zeroW >> i;
-            int curD = zeroDirectionCount << i;
+            int curD = zeroDirectionCount << branchFactor / 2 * i;
 
             // Debug.Log(i + " , w:" + curW + ", d: " + curD);
 
@@ -55,6 +61,8 @@ public class radiance_cascades_2d : MonoBehaviour
 
             cascade_pass.SetTexture("_PrevCascade", PrevCascade);
             cascade_pass.SetInt("NCascades", nCascades);
+            cascade_pass.SetInt("BranchFactor", branchFactor);
+            cascade_pass.SetInt("ZeroIntervalPow", zeroIntervalPow);
             cascade_pass.SetInt("CurCascade", i);
             cascade_pass.SetInt("W", curW);
             cascade_pass.SetInt("DirectionCount", curD);

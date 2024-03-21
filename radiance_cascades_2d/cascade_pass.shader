@@ -36,6 +36,8 @@ Shader "Hidden/cascade_pass"
                 return o;
             }
             
+            int ZeroIntervalPow;
+            int BranchFactor;
             int CurCascade;
             int NCascades;
             //
@@ -67,16 +69,23 @@ Shader "Hidden/cascade_pass"
             }
 
             bool ray_intersecs_scene(float2 pos, float2 dir) {
-                // Промежуток, на котором трекаем луч: ( 2^CurCascade, 2^(CurCascade + 1) ]
                 // 1-й каскад -- 8 пикселей вокруг, 2-ый -- 16 и тд
-                int total_steps = CurCascade == 0 ? 1 << 3 : 1 << (3 + CurCascade);
-                float2 start_step = CurCascade == 0 ? pos + dir : pos + (dir * (1 << 3) * (1 << CurCascade - 1));
+                
+                int zero_interval = 1 << ZeroIntervalPow;
+                int total_steps = CurCascade == 0 ? zero_interval : 1 << (ZeroIntervalPow + CurCascade);
+                float2 start_step = CurCascade == 0 ? pos + dir : pos + dir * zero_interval * ((1 << CurCascade) - 1);
+
+                // int zero_interval = 1 << ZeroIntervalPow;
+                // int total_steps = CurCascade == 0 ? zero_interval : zero_interval * (1 << (CurCascade - 1));
+                // float2 start_step = CurCascade == 0 ? pos + dir : pos + dir * zero_interval * (1 << (CurCascade - 1));
+
                 float4 cur_step_color = tex2D(_MainTex, start_step);
 
                 int k = 0;
 
                 [loop]
-                for (k; k < total_steps; ++k) {
+                for (k; k < total_steps; ++k) 
+                {
                     
                     if (floor(cur_step_color.x) == 0)
                     {
@@ -106,24 +115,24 @@ Shader "Hidden/cascade_pass"
                 float pi = 3.1415926;
                 float cur_angle = (2 * pi / DirectionCount) * angle_idx;
                 // смещение
-                cur_angle += cur_angle / 2;
+                cur_angle += 3 * cur_angle / 4;
                 
                 return ray_march(cur_angle, source_uv);
             }
 
             float merge_with_prev(float2 uv, float2 source_tex_coord, float angle_idx) {
                 float result = 0.0;
-                int prev_rays = 2;
                 int prev_w = W >> 1;
-                int prev_d = DirectionCount << 1;
+                int prev_d = DirectionCount << 1 * BranchFactor / 2;
 
                 float w_half_pixels = _MainTex_TexelSize.z / (float(prev_w * 2));
                 float w_half_coordinates = w_half_pixels / _MainTex_TexelSize.z;
                 source_tex_coord.x = clamp(source_tex_coord.x, w_half_coordinates, w_half_coordinates * (prev_w * 2 - 1));
-
-                for (int j = 1; j <= prev_rays; ++j) {
+                
+                [loop]
+                for (int j = 1; j <= BranchFactor; ++j) {
                     
-                    int dir_n = angle_idx * 2 + (j-1);
+                    int dir_n = angle_idx * BranchFactor + (j-1);
                     float2 square_coord = float2(
                         source_tex_coord.x / prev_d + prev_w / _PrevCascade_TexelSize.z * dir_n,
                         uv.y
@@ -133,7 +142,7 @@ Shader "Hidden/cascade_pass"
 
                 }
 
-                result /= prev_rays;
+                result /= BranchFactor;
                 return result;
             }
 
@@ -150,7 +159,8 @@ Shader "Hidden/cascade_pass"
                 float result = get_result(source_tex_coord, angle_idx);
                 
                 // если пересеклись или на последнем каскаде -- возвращаем значение
-                if (CurCascade == NCascades - 1 || result == 0.0) {
+                if (CurCascade == NCascades - 1 || result == 0.0) 
+                {
                     return result;
                 }
 
