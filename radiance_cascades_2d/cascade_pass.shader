@@ -36,12 +36,14 @@ Shader "Hidden/cascade_pass"
                 return o;
             }
             
-            int ZeroIntervalPow;
-            int BranchFactor;
+            int ZeroIntervalPixels;
             int CurCascade;
             int NCascades;
+            int BranchFactor;
+            int RadiusScaleFactor;
+            int CurInnerRadius;
+            int CurOuterRadius;
             //
-            int W;
             int DirectionCount;
             float SunSize;
             float SkyIntensity;
@@ -68,16 +70,11 @@ Shader "Hidden/cascade_pass"
                 return light;
             }
 
-            bool ray_intersecs_scene(float2 pos, float2 dir) {
-                // 1-й каскад -- 8 пикселей вокруг, 2-ый -- 16 и тд
-                
-                int zero_interval = 1 << ZeroIntervalPow;
-                int total_steps = CurCascade == 0 ? zero_interval : 1 << (ZeroIntervalPow + CurCascade);
-                float2 start_step = CurCascade == 0 ? pos + dir : pos + dir * zero_interval * ((1 << CurCascade) - 1);
-
-                // int zero_interval = 1 << ZeroIntervalPow;
-                // int total_steps = CurCascade == 0 ? zero_interval : zero_interval * (1 << (CurCascade - 1));
-                // float2 start_step = CurCascade == 0 ? pos + dir : pos + dir * zero_interval * (1 << (CurCascade - 1));
+            bool ray_intersecs_scene(float2 pos, float2 dir) 
+            {
+                float2 start_step = CurCascade == 0 ? pos + dir : pos + dir * CurInnerRadius;
+                float2 end_step = pos + dir * CurOuterRadius;
+                int total_steps = length(end_step - start_step) / length(_MainTex_TexelSize.xy);
 
                 float4 cur_step_color = tex2D(_MainTex, start_step);
 
@@ -99,72 +96,65 @@ Shader "Hidden/cascade_pass"
                 return false;
             }
 
-            float ray_march(float cur_angle, float2 source_uv) 
+            float get_prev_cascade_radiance(float2 source_uv, float angle_idx) 
             {
-                float2 cur_angle_dir = float2(sin(cur_angle), cos(cur_angle)) * _MainTex_TexelSize.xy;
-
-                if (ray_intersecs_scene(source_uv, cur_angle_dir)) {
-                    return 0.0;
-                }
-
-                return get_light(cur_angle_dir);
-            }
-
-            float get_result(float2 source_uv, int angle_idx) 
-            {
-                float pi = 3.1415926;
-                float cur_angle = (2 * pi / DirectionCount) * angle_idx;
-                // смещение
-                cur_angle += 3 * cur_angle / 4;
-                
-                return ray_march(cur_angle, source_uv);
-            }
-
-            float merge_with_prev(float2 uv, float2 source_tex_coord, float angle_idx) {
                 float result = 0.0;
-                int prev_w = W >> 1;
-                int prev_d = DirectionCount << 1 * BranchFactor / 2;
+                int prev_resolution = _PrevCascade_TexelSize.w;
+                int prev_dir_count = DirectionCount * BranchFactor;
 
-                float w_half_pixels = _MainTex_TexelSize.z / (float(prev_w * 2));
-                float w_half_coordinates = w_half_pixels / _MainTex_TexelSize.z;
-                source_tex_coord.x = clamp(source_tex_coord.x, w_half_coordinates, w_half_coordinates * (prev_w * 2 - 1));
+                float w_half_coordinates = 0.5 / float(prev_resolution);
+                source_uv.x = clamp(source_uv.x, w_half_coordinates, 1.0 - w_half_coordinates);
                 
                 [loop]
-                for (int j = 1; j <= BranchFactor; ++j) {
+                for (int j = 0; j < BranchFactor; ++j) {
                     
-                    int dir_n = angle_idx * BranchFactor + (j-1);
+                    int dir_n = angle_idx * BranchFactor + j;
                     float2 square_coord = float2(
-                        source_tex_coord.x / prev_d + prev_w / _PrevCascade_TexelSize.z * dir_n,
-                        uv.y
+                        source_uv.x / prev_dir_count + prev_resolution / _PrevCascade_TexelSize.z * dir_n,
+                        source_uv.y
                     );
 
                     result += tex2D(_PrevCascade, square_coord).r;
-
                 }
 
                 result /= BranchFactor;
                 return result;
             }
 
+            float ray_march(float cur_angle, float2 source_uv, int angle_idx) 
+            {
+                float2 cur_angle_dir = float2(sin(cur_angle), cos(cur_angle)) * _MainTex_TexelSize.xy;
+
+                if (ray_intersecs_scene(source_uv, cur_angle_dir)) {
+                    return 0.0;
+                }
+                
+                if (CurCascade == NCascades - 1) {
+                    return get_light(cur_angle_dir);
+                }
+
+                return get_prev_cascade_radiance(source_uv, angle_idx);
+            }
+
+            float get_result(float2 source_uv, int angle_idx) 
+            {
+                float pi = 3.1415926;
+                float cur_angle = (2 * pi / DirectionCount) * (angle_idx + 0.5);  // angle_idx + shift
+                
+                return ray_march(cur_angle, source_uv, angle_idx);
+            }
+
+
             float frag (v2f i) : SV_Target
             {
                 int angle_idx = floor(i.uv.x * DirectionCount);
 
                 float2 source_tex_coord = float2(
-                    // (i.uv.x - float(W) / OutputTexWidth * angle_idx) * float(DirectionCount),
                     modf(i.uv.x * DirectionCount, angle_idx),
                     i.uv.y
                 );
                 
-                float result = get_result(source_tex_coord, angle_idx);
-                
-                // если пересеклись или на последнем каскаде -- возвращаем значение
-                if (CurCascade == NCascades - 1 || result == 0.0) 
-                {
-                    return result;
-                }
-
-                return merge_with_prev(i.uv, source_tex_coord, angle_idx);
+                return get_result(source_tex_coord, angle_idx);
             }
             
             ENDCG
