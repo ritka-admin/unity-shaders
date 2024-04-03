@@ -36,6 +36,7 @@ Shader "Hidden/occlusion_pass"
             }
 
             int DirectionCount;
+            float contrast;
 
             sampler2D _MainTex;
             sampler2D _RadianceTex;
@@ -65,9 +66,13 @@ Shader "Hidden/occlusion_pass"
 
                     res += tex2D(_RadianceTex, square_coord).r;
                 }
-
+                
                 res /= DirectionCount;
                 return float4(res, res, res, 1.0);
+
+                // float4 color = float4(res, res, res, 1.0);
+                // return pow(color, 5.0) * 50.0;
+                // return saturate(lerp(float4(0.5, 0.5, 0.5, 1), color, contrast));
             }
             ENDCG
         }

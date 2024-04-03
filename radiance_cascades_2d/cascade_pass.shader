@@ -41,8 +41,8 @@ Shader "Hidden/cascade_pass"
             int NCascades;
             int BranchFactor;
             int RadiusScaleFactor;
-            int CurInnerRadius;
-            int CurOuterRadius;
+            float CurInnerRadius;
+            float CurOuterRadius;
             //
             int DirectionCount;
             float SunSize;
@@ -72,16 +72,18 @@ Shader "Hidden/cascade_pass"
 
             bool ray_intersecs_scene(float2 pos, float2 dir) 
             {
-                float2 start_step = CurCascade == 0 ? pos + dir : pos + dir * CurInnerRadius;
+                // int cross_steps = 2 * CurCascade;
+                int cross_steps = 0;
+                float2 start_step = CurCascade == 0 ? pos + dir : pos + dir * (CurInnerRadius - cross_steps);
                 float2 end_step = pos + dir * CurOuterRadius;
-                int total_steps = length(end_step - start_step) / length(_MainTex_TexelSize.xy);
+                int total_steps = length(end_step - start_step) / length(dir);
 
                 float4 cur_step_color = tex2D(_MainTex, start_step);
 
                 int k = 0;
 
                 [loop]
-                for (k; k < total_steps; ++k) 
+                for (k; k < total_steps; ++k)
                 {
                     
                     if (floor(cur_step_color.x) == 0)
@@ -96,22 +98,22 @@ Shader "Hidden/cascade_pass"
                 return false;
             }
 
-            float get_prev_cascade_radiance(float2 source_uv, float angle_idx) 
+            float get_prev_cascade_radiance(float2 position, float angle_idx) 
             {
                 float result = 0.0;
                 int prev_resolution = _PrevCascade_TexelSize.w;
                 int prev_dir_count = DirectionCount * BranchFactor;
 
                 float w_half_coordinates = 0.5 / float(prev_resolution);
-                source_uv.x = clamp(source_uv.x, w_half_coordinates, 1.0 - w_half_coordinates);
+                position.x = clamp(position.x, w_half_coordinates, 1.0 - w_half_coordinates);
                 
                 [loop]
                 for (int j = 0; j < BranchFactor; ++j) {
                     
                     int dir_n = angle_idx * BranchFactor + j;
                     float2 square_coord = float2(
-                        source_uv.x / prev_dir_count + prev_resolution / _PrevCascade_TexelSize.z * dir_n,
-                        source_uv.y
+                        (dir_n + position.x) / prev_dir_count,
+                        position.y
                     );
 
                     result += tex2D(_PrevCascade, square_coord).r;
@@ -121,11 +123,11 @@ Shader "Hidden/cascade_pass"
                 return result;
             }
 
-            float ray_march(float cur_angle, float2 source_uv, int angle_idx) 
+            float ray_march(float cur_angle, float2 position, int angle_idx) 
             {
-                float2 cur_angle_dir = float2(sin(cur_angle), cos(cur_angle)) * _MainTex_TexelSize.xy;
+                float2 cur_angle_dir = float2(cos(cur_angle), sin(cur_angle)) * _MainTex_TexelSize.xy;
 
-                if (ray_intersecs_scene(source_uv, cur_angle_dir)) {
+                if (ray_intersecs_scene(position, cur_angle_dir)) {
                     return 0.0;
                 }
                 
@@ -133,15 +135,14 @@ Shader "Hidden/cascade_pass"
                     return get_light(cur_angle_dir);
                 }
 
-                return get_prev_cascade_radiance(source_uv, angle_idx);
+                return get_prev_cascade_radiance(position, angle_idx);
             }
 
-            float get_result(float2 source_uv, int angle_idx) 
+            float get_result(float2 position, int angle_idx) 
             {
                 float pi = 3.1415926;
                 float cur_angle = (2 * pi / DirectionCount) * (angle_idx + 0.5);  // angle_idx + shift
-                
-                return ray_march(cur_angle, source_uv, angle_idx);
+                return ray_march(cur_angle, position, angle_idx);
             }
 
 

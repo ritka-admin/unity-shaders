@@ -40,31 +40,32 @@ public class radiance_cascades_2d : MonoBehaviour
     [Range(0, 360)]
     public float sunAngle = 0;
 
+    [Range(0f, 100f)] 
+    public float contrast = 1f;
+
     void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
         cascade_pass = new Material( Shader.Find("Hidden/cascade_pass") );
         occlusion_pass = new Material( Shader.Find("Hidden/occlusion_pass") );
 
-        OcclusionTexture = Resources.Load<Texture2D>("point");
+        OcclusionTexture = Resources.Load<Texture2D>("my_game2");
         OcclusionTexture.wrapMode = TextureWrapMode.Clamp;
 
         // fill and merge all cascades
         RenderTexture PrevCascade = null;
 
         // first prevs correspond with the last
-        int prevCascadeResolution = zeroResolution >> nCascades;
+        int prevCascadeResolution = zeroResolution >> nCascades - 1;
         int prevCascadeDirCount = (int) Mathf.Pow(branchFactor, nCascades - 1) * zeroDirectionCount;
-        int prevCascadeInnerRadius = (int) Mathf.Pow(radiusScaleFactor, nCascades - 2) * zeroIntervalPixels;
-        int prevCascadeOuterRadius = (int) Mathf.Pow(radiusScaleFactor, nCascades - 1) * zeroIntervalPixels;
+        float prevCascadeInnerRadius = Mathf.Pow(radiusScaleFactor, nCascades - 2) * zeroIntervalPixels;
+        float prevCascadeOuterRadius = Mathf.Pow(radiusScaleFactor, nCascades - 1) * zeroIntervalPixels;
 
         for (int i = nCascades - 1; i >= 0; --i) 
         {
             int curR = i == nCascades - 1 ? prevCascadeResolution : prevCascadeResolution * 2;
             int curD = i == nCascades - 1 ? prevCascadeDirCount : prevCascadeDirCount / branchFactor;
-            int curInnerRadius = i == nCascades - 1 ? prevCascadeInnerRadius : prevCascadeInnerRadius / radiusScaleFactor;
-            int curOuterRadius = i == nCascades - 1 ? prevCascadeOuterRadius : prevCascadeInnerRadius;
-
-            // Debug.Log(i + " , w:" + curR + ", d: " + curD);
+            float curInnerRadius = i == nCascades - 1 ? prevCascadeInnerRadius : prevCascadeInnerRadius / radiusScaleFactor;
+            float curOuterRadius = i == nCascades - 1 ? prevCascadeOuterRadius : prevCascadeInnerRadius;
 
             RenderTexture RadianceTexture = RenderTexture.GetTemporary(curR * curD, curR, 0, RenderTextureFormat.RFloat);
             RadianceTexture.filterMode = FilterMode.Bilinear;
@@ -77,8 +78,8 @@ public class radiance_cascades_2d : MonoBehaviour
             cascade_pass.SetInt("BranchFactor", branchFactor);
             cascade_pass.SetInt("RadiusScaleFactor", radiusScaleFactor);
             cascade_pass.SetInt("ZeroIntervalPixels", zeroIntervalPixels);
-            cascade_pass.SetInt("CurInnerRadius", curInnerRadius);
-            cascade_pass.SetInt("CurOuterRadius", curOuterRadius);
+            cascade_pass.SetFloat("CurInnerRadius", curInnerRadius);
+            cascade_pass.SetFloat("CurOuterRadius", curOuterRadius);
             cascade_pass.SetInt("CurCascade", i);
             cascade_pass.SetInt("DirectionCount", curD);
             cascade_pass.SetFloat("OutputTexWidth", RadianceTexture.width);
@@ -101,6 +102,7 @@ public class radiance_cascades_2d : MonoBehaviour
         // uniforms for resulting pass
         occlusion_pass.SetTexture("_RadianceTex", PrevCascade);
         occlusion_pass.SetInt("DirectionCount", zeroDirectionCount);
+        occlusion_pass.SetFloat("contrast", contrast);
 
         Graphics.Blit(OcclusionTexture, destination, occlusion_pass);
 
