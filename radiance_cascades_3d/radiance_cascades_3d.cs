@@ -28,7 +28,7 @@ public class radiance_cascades_3d : MonoBehaviour
     [Range(1, 9)]
     public int nCascades = 1;
 
-    [Range(0, 1)]
+    [Range(0, 3)]
     public float skyIntensity = 0;
 
     [Range(1, 90)]
