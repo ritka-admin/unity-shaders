@@ -38,7 +38,6 @@ Shader "Hidden/occlusion_pass_3d"
             int DirectionCount;
             float SkyIntensity;
 
-            // sampler2D _MainTex;
             sampler2D_float _RadianceTex;
             sampler2D_float _CameraDepthNormalsTexture;
             float4 _MainTex_TexelSize;
@@ -68,7 +67,7 @@ Shader "Hidden/occlusion_pass_3d"
                         light = sectors_value.w;
                     }
 
-                    result += max(0.0, dot(dir, normal)) * light; // OK
+                    result += max(0.0, dot(dir, normal)) * light;
                 }
 
                 return result;
@@ -90,7 +89,7 @@ Shader "Hidden/occlusion_pass_3d"
                         i.uv.y
                     );
 
-                    float angle2d = (2 * pi / DirectionCount) * (j + 0.5);
+                    float angle2d = (2 * pi / DirectionCount) * (j);        // TODO: смещение
                     float2 dir2d = float2(sin(angle2d), cos(angle2d));
                     res += get_dir_result(dir2d, square_coord, normal);
                     
