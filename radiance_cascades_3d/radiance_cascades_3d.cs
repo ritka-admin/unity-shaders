@@ -10,10 +10,10 @@ public class radiance_cascades_3d : MonoBehaviour
     private Material occlusion_pass;
     private Texture2D OcclusionTexture;
 
-    [Range(0, 512)]
+    [Range(1, 512)]
     public int zeroResolution = 256;
 
-    [Range(1, 100)]
+    [Range(1, 64)]
     public int zeroDirectionCount = 4;
 
     [Range(4, 1000)]
@@ -64,7 +64,8 @@ public class radiance_cascades_3d : MonoBehaviour
 
         for (int i = nCascades - 1; i >= 0; --i) 
         {
-            int curR = i == nCascades - 1 ? prevCascadeResolution : prevCascadeResolution * 2;
+            // int curR = i == nCascades - 1 ? prevCascadeResolution : prevCascadeResolution * 2;
+            int curR = source.width;
             int curD = i == nCascades - 1 ? prevCascadeDirCount : prevCascadeDirCount / branchFactor;
             float curInnerRadius = i == nCascades - 1 ? prevCascadeInnerRadius : prevCascadeInnerRadius / radiusScaleFactor;
             float curOuterRadius = i == nCascades - 1 ? prevCascadeOuterRadius : prevCascadeInnerRadius;

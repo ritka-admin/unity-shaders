@@ -39,14 +39,16 @@ Shader "Hidden/occlusion_pass_3d"
             float SkyIntensity;
 
             // sampler2D _MainTex;
-            sampler2D _RadianceTex;
-            sampler2D _CameraDepthNormalsTexture;
+            sampler2D_float _RadianceTex;
+            sampler2D_float _CameraDepthNormalsTexture;
             float4 _MainTex_TexelSize;
             float4 _RadianceTex_TexelSize;
+            float4 _CameraDepthTexture_TexelSize;
 
-            const float pi = 3.1415926;
+            static const float pi = 3.1415926;
 
-            float get_dir_result(float2 dir2d, float2 radiance_uv, float3 normal) {
+            float get_dir_result(float2 dir2d, float2 radiance_uv, float3 normal) 
+            {
                 float result = 0.0;
                 float4 sectors_value = tex2D(_RadianceTex, radiance_uv);
 
@@ -66,7 +68,7 @@ Shader "Hidden/occlusion_pass_3d"
                         light = sectors_value.w;
                     }
 
-                    result += max(0.0, dot(normalize(dir), normalize(normal))) * light; // OK
+                    result += max(0.0, dot(dir, normal)) * light; // OK
                 }
 
                 return result;
@@ -88,18 +90,16 @@ Shader "Hidden/occlusion_pass_3d"
                         i.uv.y
                     );
 
-                    // if (j == 2) {
-                    //     return tex2D(_RadianceTex, square_coord);
-                    // }
-
-                    float4 sectors_value = tex2D(_RadianceTex, square_coord);
                     float angle2d = (2 * pi / DirectionCount) * (j + 0.5);
-                    float2 dir2d = float2(sin(angle2d), cos(angle2d)) * _MainTex_TexelSize.xy;
-                    
+                    float2 dir2d = float2(sin(angle2d), cos(angle2d));
                     res += get_dir_result(dir2d, square_coord, normal);
+                    
+                    // 2
+                    // float4 sectors_value = tex2D(_RadianceTex, square_coord);
+                    // res += sectors_value.x + sectors_value.y + sectors_value.z + sectors_value.w;
                 }
                 
-                res /= DirectionCount; // OK
+                res /= (DirectionCount * 4); // OK
                 return float4(res, res, res, 1.0);
             }
             ENDCG
