@@ -127,7 +127,7 @@ Shader "Hidden/cascade_pass_3d"
                 float theta = (bit_index + 0.5) / visibilityBitCount * pi;
                 float3 dir = float3(dir2d * sin(theta), cos(theta));
                 float light = get_sky_light(dir); // * sin(theta)
-                // float light = max(0.0, dot(dir, normal)) * get_sky_light(dir) * sin(theta);
+                // float light = max(0.0, dot(dir, normal)) * get_sky_light(dir);
 
                 return add_to_sector_component(sector, light, float4(0.0, 0.0, 0.0, 0.0));
             }
@@ -220,7 +220,7 @@ Shader "Hidden/cascade_pass_3d"
             float4 frag(v2f i) : SV_Target
             {
                 int angle_idx = floor(i.uv.x * DirectionCount);
-                float phi = (2 * pi / DirectionCount) * (angle_idx + 0.5); // TODO: смещение?
+                float phi = (2 * pi / DirectionCount) * (angle_idx);  // TODO: смещение
 
                 float2 source_tex_coord = float2(
                     modf(i.uv.x * DirectionCount, angle_idx),

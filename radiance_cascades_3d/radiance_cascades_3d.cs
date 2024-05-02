@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [ExecuteInEditMode]
+[ExecuteAlways]
 [ImageEffectAllowedInSceneView]
+[RequireComponent(typeof(Camera))]
 public class radiance_cascades_3d : MonoBehaviour
 {
     private Material cascade_pass;
