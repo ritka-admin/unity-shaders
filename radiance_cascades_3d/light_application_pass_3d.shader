@@ -1,4 +1,4 @@
-Shader "Hidden/occlusion_pass_3d"
+Shader "Hidden/light_application_pass_3d"
 {
     Properties
     {
@@ -89,16 +89,12 @@ Shader "Hidden/occlusion_pass_3d"
                         i.uv.y
                     );
 
-                    float angle2d = (2 * pi / DirectionCount) * (j);        // TODO: смещение
+                    float angle2d = (2 * pi / DirectionCount) * (j + 0.5);
                     float2 dir2d = float2(sin(angle2d), cos(angle2d));
                     res += get_dir_result(dir2d, square_coord, normal);
-                    
-                    // 2
-                    // float4 sectors_value = tex2D(_RadianceTex, square_coord);
-                    // res += sectors_value.x + sectors_value.y + sectors_value.z + sectors_value.w;
                 }
                 
-                res /= (DirectionCount * 4); // OK
+                res /= (DirectionCount * 4);
                 return float4(res, res, res, 1.0);
             }
             ENDCG
