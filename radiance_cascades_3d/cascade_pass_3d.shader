@@ -52,8 +52,8 @@ Shader "Hidden/cascade_pass_3d"
             float SunDirectionZ;
             
             sampler2D _MainTex;
-            sampler2D _PrevCascade;
-            sampler2D _CameraDepthTexture;
+            sampler2D_float _PrevCascade;
+            sampler2D_float _CameraDepthTexture;
             sampler2D _CameraDepthNormalsTexture;
             float4 _MainTex_TexelSize;
             float4 _PrevCascade_TexelSize;
@@ -63,6 +63,7 @@ Shader "Hidden/cascade_pass_3d"
             static const int nSectors = 4;
             static const int sectorRays = 8;
             static const float pi = 3.1415926;
+
             
             uint create_mask(uint start, uint count)
             {
@@ -72,6 +73,11 @@ Shader "Hidden/cascade_pass_3d"
             bool bit_is_set(uint mask, int index)
             {
                 return (mask & (1 << index)) != 0;
+            }
+
+            uint get_sector_value(uint visibility_mask, int sector)
+            {
+                return (visibility_mask >> (8 * sector)) & 255;
             }
 
             float get_sky_light(float3 dir) 
@@ -96,13 +102,6 @@ Shader "Hidden/cascade_pass_3d"
             float3 get_normal(float2 uv) 
             {
                 return DecodeViewNormalStereo(tex2D(_CameraDepthNormalsTexture, uv));
-
-                // float _depth;
-                // float3 normal;
-
-                // float4 depth_normal = tex2D(_CameraDepthNormalsTexture, uv);
-                // DecodeDepthNormal(depth_normal, _depth, normal);
-                // return normal;
             }
 
             float4 add_to_sector_component(int sector, float add, float4 res)
@@ -120,15 +119,13 @@ Shader "Hidden/cascade_pass_3d"
                 return res;
             }
 
-            float4 get_sector_light(int bit_index, float2 dir2d, float3 normal) 
+            float4 get_sector_light(int bit_index, float2 dir2d) 
             {
                 int sector = floor(float(bit_index) / float(visibilityBitCount) * nSectors);
 
                 float theta = (bit_index + 0.5) / visibilityBitCount * pi;
                 float3 dir = float3(dir2d * sin(theta), cos(theta));
                 float light = get_sky_light(dir); // * sin(theta)
-                // float light = max(0.0, dot(dir, normal)) * get_sky_light(dir);
-
                 return add_to_sector_component(sector, light, float4(0.0, 0.0, 0.0, 0.0));
             }
 
@@ -155,13 +152,13 @@ Shader "Hidden/cascade_pass_3d"
                 return ~occlusion;
             }
 
-            float4 get_last_cascade_radiance(float2 uv, float2 dir2d, uint visibility_mask, float3 normal)
+            float4 get_last_cascade_radiance(float2 uv, float2 dir2d, uint visibility_mask)
             {
                 float4 result = float4(0.0, 0.0, 0.0, 0.0);
                 
                 for (int j = 0; j < visibilityBitCount; j++) {
                     if (!bit_is_set(visibility_mask, j)) continue;      // if sector is occcluded
-                    float4 partial_res = get_sector_light(j, dir2d, normal);
+                    float4 partial_res = get_sector_light(j, dir2d);
                     result += partial_res;
                 }
                 
@@ -173,11 +170,9 @@ Shader "Hidden/cascade_pass_3d"
                 float4 result = float4(0.0, 0.0, 0.0, 0.0);
                 float4 non_occluded_sectors = float4(0.0, 0.0, 0.0, 0.0);
 
-                for (int j = 0; j < visibilityBitCount; ++j) {
-                    int sector = floor(float(j) / float(visibilityBitCount) * nSectors);
-                    if (bit_is_set(visibility_mask, j)) {    // if sector not occluded
-                        non_occluded_sectors = add_to_sector_component(sector, 1, non_occluded_sectors);
-                    }
+                for (int j = 0; j < nSectors; ++j) {
+                    int sector_value = get_sector_value(visibility_mask, j);
+                    non_occluded_sectors = add_to_sector_component(j, countbits(sector_value), non_occluded_sectors);
                 }
 
                 int prev_resolution = _PrevCascade_TexelSize.w;
@@ -206,11 +201,10 @@ Shader "Hidden/cascade_pass_3d"
             {
                 float2 dir2d = float2(sin(phi), cos(phi));
                 float3 position = get_camera_position(uv);
-                float3 normal = get_normal(uv);
                 uint visibility_mask = get_visibility_mask(position, uv, dir2d * _CameraDepthTexture_TexelSize.xy);
 
                 if (CurCascade == NCascades - 1) {
-                    return get_last_cascade_radiance(uv, dir2d, visibility_mask, normal);
+                    return get_last_cascade_radiance(uv, dir2d, visibility_mask);
                 }
                 
                 return get_prev_cascade_radiance(uv, dir2d, visibility_mask, angle_idx);
@@ -220,14 +214,13 @@ Shader "Hidden/cascade_pass_3d"
             float4 frag(v2f i) : SV_Target
             {
                 int angle_idx = floor(i.uv.x * DirectionCount);
-                float phi = (2 * pi / DirectionCount) * (angle_idx);  // TODO: смещение
+                float phi = (2 * pi / DirectionCount) * (angle_idx + 0.5);
 
                 float2 source_tex_coord = float2(
                     modf(i.uv.x * DirectionCount, angle_idx),
                     i.uv.y
                 );
                 
-                // return tex2D(_MainTex, source_tex_coord);
                 return get_result(phi, source_tex_coord, angle_idx);
             }
             
