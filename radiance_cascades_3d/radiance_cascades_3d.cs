@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -45,6 +46,18 @@ public class radiance_cascades_3d : MonoBehaviour
     [Range(-30.0f, 90.0f)]
 	public float sunHeight = 45.0f;
 
+    private struct CascadeSettings
+    {
+        public int index;
+        public int width;
+        public int height;
+        public int directionCount;
+        public float innerRadius;
+        public float outerRadius;
+    }
+
+	private List<CascadeSettings> settingsList = new List<CascadeSettings>();
+
     void OnPreCull()
 	{
 		GetComponent<Camera>().depthTextureMode |= DepthTextureMode.Depth|DepthTextureMode.DepthNormals;
@@ -55,30 +68,35 @@ public class radiance_cascades_3d : MonoBehaviour
         cascade_pass = new Material( Shader.Find("Hidden/cascade_pass_3d") );
         occlusion_pass = new Material( Shader.Find("Hidden/light_application_pass_3d") );
 
+        {
+            settingsList.Clear();
+            var settings = new CascadeSettings();
+            settings.index = 0;
+            settings.width = source.width;
+            settings.height = source.height;
+            settings.directionCount = zeroDirectionCount;
+            settings.innerRadius = 1;
+            settings.outerRadius = zeroIntervalPixels;
+            settingsList.Add(settings);
+            for (int i = 1; i < nCascades; ++i)
+            {
+                ++settings.index;
+                settings.width = Math.Max(1, settings.width / 2);
+                settings.height = Math.Max(1, settings.height / 2);
+                settings.directionCount *= branchFactor;
+                settings.innerRadius = settings.outerRadius;
+                settings.outerRadius *= radiusScaleFactor;
+                settingsList.Add(settings);
+            }
+            settingsList.Reverse();
+        }
+
         // fill and merge all cascades
         RenderTexture PrevCascade = null;
 
-        // first prevs correspond with the last
-        int zeroResolutionWidth = source.width;
-        int zeroResolutionHeight = source.height;
-        int prevCascadeResolutionWidth = zeroResolutionWidth >> nCascades - 1;
-        int prevCascadeResolutionHeight = zeroResolutionHeight >> nCascades - 1;
-        int prevCascadeDirCount = (int) Mathf.Pow(branchFactor, nCascades - 1) * zeroDirectionCount;
-        float prevCascadeInnerRadius = Mathf.Pow(radiusScaleFactor, nCascades - 2) * zeroIntervalPixels;
-        float prevCascadeOuterRadius = Mathf.Pow(radiusScaleFactor, nCascades - 1) * zeroIntervalPixels;
-
-        for (int i = nCascades - 1; i >= 0; --i) 
+        foreach (var settings in settingsList)
         {
-            int curRWidth = i == nCascades - 1 ? prevCascadeResolutionWidth : prevCascadeResolutionWidth * 2;
-            int curRHeight = i == nCascades - 1 ? prevCascadeResolutionHeight : prevCascadeResolutionHeight * 2;
-            int curD = i == nCascades - 1 ? prevCascadeDirCount : prevCascadeDirCount / branchFactor;
-            float curInnerRadius = i == nCascades - 1 ? prevCascadeInnerRadius : prevCascadeInnerRadius / radiusScaleFactor;
-            float curOuterRadius = i == nCascades - 1 ? prevCascadeOuterRadius : prevCascadeInnerRadius;
-
-            // Debug.Log(i + ", curRWidth: " + curRWidth + ", curD: " + curD);
-            // Debug.Log(i + ", curInner: " + curInnerRadius + ", curOuter: " + curOuterRadius);
-
-            RenderTexture RadianceTexture = RenderTexture.GetTemporary(curRWidth * curD, curRHeight, 0, RenderTextureFormat.ARGBFloat);
+            RenderTexture RadianceTexture = RenderTexture.GetTemporary(settings.width * settings.directionCount, settings.height, 0, RenderTextureFormat.ARGBFloat);
             RadianceTexture.filterMode = FilterMode.Bilinear;
             RadianceTexture.wrapMode = TextureWrapMode.Clamp;
 
@@ -86,10 +104,10 @@ public class radiance_cascades_3d : MonoBehaviour
             cascade_pass.SetInt("NCascades", nCascades);
             cascade_pass.SetInt("BranchFactor", branchFactor);
             cascade_pass.SetInt("RadiusScaleFactor", radiusScaleFactor);
-            cascade_pass.SetFloat("CurInnerRadius", curInnerRadius);
-            cascade_pass.SetFloat("CurOuterRadius", curOuterRadius);
-            cascade_pass.SetInt("CurCascade", i);
-            cascade_pass.SetInt("DirectionCount", curD);
+            cascade_pass.SetFloat("CurInnerRadius", settings.innerRadius);
+            cascade_pass.SetFloat("CurOuterRadius", settings.outerRadius);
+            cascade_pass.SetInt("CurCascade", settings.index);
+            cascade_pass.SetInt("DirectionCount", settings.directionCount);
             cascade_pass.SetFloat("SkyIntensity", skyIntensity);
             cascade_pass.SetFloat("Thickness", thickness);
             cascade_pass.SetVector("SunDirection", GetSunDirection());
@@ -100,11 +118,6 @@ public class radiance_cascades_3d : MonoBehaviour
             RenderTexture.ReleaseTemporary(PrevCascade);
             
             PrevCascade = RadianceTexture;
-            prevCascadeDirCount = curD;
-            prevCascadeResolutionWidth = curRWidth;
-            prevCascadeResolutionHeight = curRHeight;
-            prevCascadeInnerRadius = curInnerRadius;
-            prevCascadeOuterRadius = curOuterRadius;
         }
 
         // uniforms for resulting pass
