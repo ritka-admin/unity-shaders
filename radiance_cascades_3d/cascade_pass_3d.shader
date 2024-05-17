@@ -125,7 +125,7 @@ Shader "Hidden/cascade_pass_3d"
 
                 float theta = (bit_index + 0.5) / visibilityBitCount * pi;
                 float3 dir = float3(dir2d * sin(theta), cos(theta));
-                float light = get_sky_light(dir); // * sin(theta)
+                float light = get_sky_light(dir) * sin(theta);
                 return add_to_sector_component(sector, light, float4(0.0, 0.0, 0.0, 0.0));
             }
 
